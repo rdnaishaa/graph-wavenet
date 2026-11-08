@@ -1,0 +1,5 @@
+model,mean_sec_per_epoch,total_training_time_sec,best_epoch_benchmark
+Fixed GWN,3.2293,284.6711,63
+Adaptive GWN,2.906,267.8679,67
+Hybrid GWN,3.8203,401.6228,80
+GC-LSTM,0.254,23.0799,65

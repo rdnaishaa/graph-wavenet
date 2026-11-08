@@ -1,0 +1,2 @@
+model,seed,parameters,epochs_run,best_epoch,mean_sec_per_epoch,total_training_time_sec,mean_inference_time_sec,std_inference_time_sec,inference_ms_per_sample
+GC-LSTM Fair,42,553472,90,65,0.2540433378786676,23.07988099999784,0.03450373120140284,0.0026116113866111587,0.37100786238067573

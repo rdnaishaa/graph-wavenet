@@ -1,0 +1,2 @@
+num_nodes,input_length,horizons,graph_k,graph_units,temporal_filters,dropout,batch_size,max_epochs,learning_rate,seeds
+64,12,"[1, 3, 6]",4,32,64,0.2,32,300,0.0005,[42]

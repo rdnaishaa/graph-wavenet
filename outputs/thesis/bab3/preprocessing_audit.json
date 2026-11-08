@@ -1,0 +1,57 @@
+{
+  "raw_mask_matches": true,
+  "imputation_matches": true,
+  "validity_matches": true,
+  "scaler_matches_train": true,
+  "mean": 30.50661914460285,
+  "std": 11.331123867533398,
+  "scaler_points": 31424,
+  "grid_hours": 729,
+  "valid_hours": 710,
+  "original_points": 24967,
+  "missing_points": 21689,
+  "isolated_gap_hours": 320,
+  "splits": {
+    "train": {
+      "start": "2026-08-12 04:00:00+00:00",
+      "end": "2026-09-02 09:00:00+00:00",
+      "grid_hours": 510,
+      "valid_hours": 491,
+      "samples": 415,
+      "valid_targets_by_horizon": [
+        14912,
+        14912,
+        14912
+      ]
+    },
+    "val": {
+      "start": "2026-09-02 10:00:00+00:00",
+      "end": "2026-09-06 22:00:00+00:00",
+      "grid_hours": 109,
+      "valid_hours": 109,
+      "samples": 92,
+      "valid_targets_by_horizon": [
+        3008,
+        3008,
+        3008
+      ]
+    },
+    "test": {
+      "start": "2026-09-06 23:00:00+00:00",
+      "end": "2026-09-11 12:00:00+00:00",
+      "grid_hours": 110,
+      "valid_hours": 110,
+      "samples": 93,
+      "valid_targets_by_horizon": [
+        2944,
+        2944,
+        3008
+      ]
+    }
+  },
+  "example": {
+    "corridor": "tt_cawang.csv",
+    "start": "2026-08-21 02:00:00+00:00",
+    "end": "2026-08-22 04:00:00+00:00"
+  }
+}

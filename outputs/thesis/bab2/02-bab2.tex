@@ -1,0 +1,377 @@
+\chapter{\babDua}
+\label{cha:tinjauan_pustaka}
+
+Bab ini membahas dasar prediksi kecepatan lalu lintas, Graph WaveNet, pengolahan data, dan evaluasi yang mendukung rancangan penelitian.
+
+\section{Prediksi Kecepatan Lalu Lintas}
+\label{sec:traffic_forecasting}
+
+Prediksi lalu lintas atau \textit{traffic forecasting} merupakan proses memperkirakan kondisi lalu lintas pada waktu mendatang berdasarkan data historis dan pola perubahan yang terjadi pada jaringan transportasi. Prediksi lalu lintas menjadi salah satu komponen penting dalam \textit{Intelligent Transportation Systems} (ITS), karena dapat mendukung penyediaan informasi mengenai kondisi jaringan jalan sebelum waktu pengamatan berlangsung \cite{jiang2022gnntraffic}. Informasi prediksi dapat digunakan sebagai pendukung pengelolaan lalu lintas dan perencanaan perjalanan dengan mempertimbangkan kondisi yang diperkirakan terjadi pada periode berikutnya \cite{fusco2016comparative}.
+
+Variabel yang umum digunakan dalam prediksi lalu lintas meliputi kecepatan kendaraan, volume kendaraan, dan kepadatan lalu lintas. Setiap variabel menggambarkan karakteristik lalu lintas yang berbeda. Prediksi kecepatan lalu lintas atau \textit{traffic speed forecasting} secara khusus bertujuan memperkirakan nilai kecepatan kendaraan pada suatu lokasi atau koridor jalan untuk waktu mendatang. Perubahan kecepatan dapat menunjukkan variasi kondisi lalu lintas yang berkaitan dengan pola aktivitas perjalanan, karakteristik jaringan jalan, serta hubungan antara lokasi pengamatan \cite{jiang2022gnntraffic}, \cite{zhang2019multistep}.
+
+Berdasarkan jumlah langkah waktu yang diprediksi, forecasting dapat dibedakan menjadi \textit{single-step forecasting} dan \textit{multi-step forecasting}. Single-step forecasting menghasilkan prediksi untuk satu langkah waktu mendatang, sedangkan multi-step forecasting menghasilkan prediksi pada beberapa langkah waktu. Prediksi multi-langkah memungkinkan evaluasi kemampuan model pada jarak prediksi yang berbeda dan memerlukan pemodelan ketergantungan spasial-temporal yang memadai \cite{zhang2019multistep}.
+
+Dalam penelitian ini, forecasting dilakukan terhadap data kecepatan lalu lintas TomTom pada 64 koridor dengan resolusi temporal satu jam. Model menggunakan 12 langkah waktu historis sebagai masukan untuk menghasilkan prediksi pada horizon 1, 3, dan 6 jam ke depan. Ketiga horizon tersebut digunakan untuk mengevaluasi perubahan performa prediksi ketika jarak antara waktu masukan terakhir dan waktu prediksi semakin panjang. Pada grid satu jam, 12 langkah masukan mencakup $t-11$ sampai $t$, sehingga selisih waktu titik pertama dan terakhir adalah 11 jam.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{assets/pics/bab2_01_window.png}
+\caption[Contoh pembentukan window 12 jam dan target horizon 1, 3, dan 6 jam pada koridor Cawang]{Contoh pembentukan window 12 jam dan target horizon 1, 3, dan 6 jam pada koridor Cawang. Sumber: diolah dari data pelatihan TomTom.}
+\label{fig:b2-window}
+\label{fig:multi_horizon_forecasting}
+\end{figure}
+
+Gambar~\ref{fig:b2-window} memperlihatkan contoh data pada satu koridor. Titik bulat menunjukkan observasi asli, sedangkan kotak kosong menunjukkan nilai hasil imputasi. Tiga titik setelah batas masukan merupakan target aktual yang tersedia pada data historis, bukan keluaran model. Contoh dipilih untuk memperjelas perubahan kecepatan dan tidak digunakan untuk menyimpulkan performa.
+
+
+\section{Pemodelan Spasial-Temporal Berbasis Graf}
+\label{sec:representasi_graph}
+
+\subsection{Ketergantungan Spasial dan Temporal}
+\label{subsec:spatial_temporal_dependency}
+
+Data lalu lintas memiliki karakteristik spasial dan temporal yang saling berkaitan. Ketergantungan temporal merupakan hubungan antara kondisi lalu lintas pada waktu tertentu dengan kondisi pada periode sebelumnya. Sebagai contoh, pola kecepatan pada pagi hari dapat berkaitan dengan perubahan kecepatan pada jam berikutnya. Sementara itu, ketergantungan spasial menunjukkan hubungan antara kondisi lalu lintas pada lokasi yang berbeda. Informasi dari beberapa lokasi dapat digunakan secara bersamaan untuk mendukung proses prediksi \cite{jiang2022gnntraffic}, \cite{zhang2019multistep}.
+
+Hubungan spasial pada jaringan lalu lintas tidak selalu terbatas pada lokasi yang berdekatan secara geografis. Kedua lokasi yang berjauhan dapat memiliki pola perubahan yang berkaitan, sedangkan lokasi yang berdekatan belum tentu menunjukkan pola lalu lintas yang serupa. Oleh karena itu, pendekatan yang dapat mengolah hubungan antarlokasi diperlukan untuk memodelkan ketergantungan spasial secara lebih fleksibel \cite{jiang2022gnntraffic}.
+
+Pemodelan spasial-temporal bertujuan mempelajari perubahan kondisi lalu lintas berdasarkan urutan waktu dan hubungan antarlokasi secara bersamaan. Salah satu pendekatan yang telah digunakan adalah \textit{Spatio-Temporal Graph Convolutional Network} (STGCN), yang menggabungkan konvolusi graf dan konvolusi temporal untuk mempelajari kedua jenis ketergantungan tersebut \cite{yu2018stgcn}. Pendekatan lain, yaitu \textit{Diffusion Convolutional Recurrent Neural Network} (DCRNN), menggunakan mekanisme difusi pada graf serta jaringan rekuren untuk melakukan prediksi lalu lintas \cite{li2018dcrnn}.
+
+\subsection{Representasi Jaringan Lalu Lintas sebagai Graf}
+\label{subsec:graph}
+\label{subsec:traffic_graph}
+
+Graf merupakan struktur yang terdiri atas kumpulan simpul (\textit{node}) dan sisi (\textit{edge}) yang merepresentasikan hubungan antarsimpul. Dalam pemodelan jaringan lalu lintas, simpul dapat digunakan untuk mewakili lokasi sensor, ruas jalan, atau koridor pengamatan, sedangkan sisi menggambarkan hubungan yang didefinisikan antara pasangan simpul \cite{yu2018stgcn}.
+
+Secara matematis, graf dapat dinyatakan sebagai $G=(V,E)$, dengan $V$ merupakan himpunan simpul dan $E$ merupakan himpunan sisi. Hubungan antarsimpul dapat disimpan dalam \textit{adjacency matrix} berukuran $N\times N$, dengan $N$ menunjukkan jumlah simpul. Matriks tersebut dapat berisi nilai biner untuk menyatakan keberadaan hubungan atau nilai berbobot untuk menggambarkan kekuatan hubungan antarsimpul \cite{yu2018stgcn}, \cite{li2018dcrnn}.
+
+Representasi graf memungkinkan informasi dari beberapa simpul dipertimbangkan selama proses pemodelan. Berbeda dari data yang tersusun dalam grid reguler, jaringan jalan memiliki struktur hubungan yang tidak selalu beraturan. Oleh karena itu, pendekatan berbasis graf relevan untuk memodelkan data lalu lintas yang memiliki hubungan spasial kompleks \cite{yu2018stgcn}.
+
+Dalam penelitian ini, setiap koridor TomTom direpresentasikan sebagai satu simpul graf. Hubungan antarkoridor kemudian dinyatakan melalui adjacency matrix yang digunakan dalam proses forecasting. Matriks hubungan tersebut dibentuk sesuai konfigurasi representasi graf yang digunakan pada model.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{assets/pics/bab2_02_graf.png}
+\caption[Contoh subgraf dari delapan koridor berdasarkan koordinat dan adjacency geografis yang tersimpan]{Contoh subgraf dari delapan koridor berdasarkan koordinat dan adjacency geografis yang tersimpan. Sumber: diolah dari dataset penelitian.}
+\label{fig:b2-graf}
+\label{fig:traffic_network_to_graph}
+\end{figure}
+
+Gambar~\ref{fig:b2-graf} menggunakan koordinat asli dan mempertahankan sisi dari graf 64 koridor yang kedua ujungnya berada dalam delapan node contoh. Panah menyatakan hubungan KNN berarah yang didefinisikan dalam model, bukan arah perjalanan atau sambungan fisik jalan. Koordinat ditampilkan tanpa peta dasar.
+
+\subsection{Graph Neural Network}
+\label{subsec:gnn}
+
+\textit{Graph Neural Network} (GNN) merupakan pendekatan pembelajaran mendalam yang dirancang untuk mengolah data dengan struktur graf. Pada pendekatan ini, representasi suatu simpul dapat diperbarui melalui pengolahan informasi simpul tersebut dan informasi dari simpul lain yang terhubung berdasarkan struktur graf. Salah satu mekanisme yang digunakan adalah \textit{graph convolution}, yaitu operasi yang memungkinkan penggabungan informasi dengan memperhatikan hubungan antarsimpul \cite{defferrard2016chebnet}, \cite{kipf2017gcn}.
+
+Pengembangan graph convolution mencakup pendekatan berbasis spektral serta pendekatan agregasi informasi pada lingkungan simpul. Pendekatan konvolusi graf berbasis polinomial Chebyshev memungkinkan pemrosesan informasi graf dengan filter yang terlokalisasi \cite{defferrard2016chebnet}. Sementara itu, pendekatan Graph Convolutional Network (GCN) menggunakan penyederhanaan operasi konvolusi graf untuk memperbarui representasi simpul berdasarkan informasi lingkungan dan matriks hubungan yang telah dinormalisasi \cite{kipf2017gcn}.
+
+Pada data lalu lintas, penggunaan GNN memungkinkan model memproses informasi kecepatan dari beberapa koridor secara bersamaan. Dengan demikian, prediksi suatu koridor tidak hanya bergantung pada riwayat kecepatannya sendiri, tetapi juga dapat memanfaatkan informasi dari koridor lain sesuai hubungan yang digunakan dalam graf \cite{jiang2022gnntraffic}, \cite{yu2018stgcn}.
+
+
+\section{Graph WaveNet}
+\label{sec:graph_wavenet}
+
+\subsection{Arsitektur Graph WaveNet}
+\label{subsec:arsitektur_graph_wavenet}
+
+Graph WaveNet merupakan arsitektur pembelajaran mendalam yang dikembangkan untuk memodelkan ketergantungan spasial dan temporal pada data berbentuk graf. Model ini menggabungkan \textit{graph convolution} untuk mempelajari hubungan antarsimpul dan \textit{dilated causal convolution} untuk mempelajari pola perubahan terhadap waktu. Selain itu, Graph WaveNet memperkenalkan mekanisme \textit{adaptive adjacency matrix} yang memungkinkan struktur hubungan dipelajari selama proses pelatihan \cite{wu2019graphwavenet}.
+
+Arsitektur Graph WaveNet terdiri atas beberapa lapisan spasial-temporal yang disusun secara bertingkat. Data masukan terlebih dahulu diproyeksikan menjadi representasi fitur, kemudian diproses melalui komponen konvolusi temporal dan konvolusi graf. Pada setiap lapisan, mekanisme \textit{residual connection} dan \textit{skip connection} digunakan untuk mendukung aliran informasi selama proses pembelajaran. Representasi yang dihasilkan selanjutnya diolah oleh lapisan keluaran untuk menghasilkan prediksi \cite{wu2019graphwavenet}.
+
+Graph WaveNet berbeda dari model yang sepenuhnya menggunakan proses rekuren untuk mempelajari hubungan temporal. Arsitektur ini memanfaatkan konvolusi temporal berdilatasi sehingga informasi dari beberapa langkah waktu dapat diproses melalui lapisan konvolusi. Pada rancangan aslinya, model juga dapat menghasilkan beberapa langkah prediksi secara langsung tanpa harus menghasilkan prediksi secara rekursif untuk setiap langkah waktu \cite{wu2019graphwavenet}.
+
+Dalam penelitian ini, Graph WaveNet digunakan sebagai arsitektur utama untuk memprediksi kecepatan lalu lintas berdasarkan data historis dari beberapa koridor. Implementasi model disesuaikan dengan struktur data dan horizon prediksi yang digunakan dalam eksperimen.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{assets/pics/bab2_03_arsitektur.png}
+\caption[Skema aliran data Graph WaveNet]{Skema aliran data Graph WaveNet. Sumber: digambar ulang berdasarkan \cite{wu2019graphwavenet} dan disesuaikan dengan struktur kode penelitian.}
+\label{fig:b2-arsitektur}
+\label{fig:arsitektur_graph_wavenet}
+\end{figure}
+
+Gambar~\ref{fig:b2-arsitektur} menunjukkan bahwa keluaran konvolusi temporal diteruskan menuju jalur skip dan konvolusi graf. Jalur residual mempertahankan informasi masukan lapisan, sedangkan akumulasi skip diproses oleh kepala keluaran. Dimensi batch tidak ditampilkan; $N$ menyatakan jumlah koridor dan $F$ jumlah fitur masukan.
+
+\subsection{Dilated Causal Convolution}
+\label{subsec:dilated_causal_convolution}
+
+\textit{Dilated causal convolution} merupakan mekanisme konvolusi temporal yang digunakan untuk mempelajari hubungan pada urutan data. Konsep ini berkaitan dengan pengembangan WaveNet yang menggunakan konvolusi kausal berdilatasi untuk memodelkan data sekuensial \cite{oord2016wavenet}. Pada konvolusi kausal, informasi yang digunakan untuk menghasilkan representasi pada suatu waktu dibatasi pada observasi yang tersedia sampai waktu tersebut.
+
+Dilasi merupakan pengaturan jarak antarposisi data yang diproses oleh filter konvolusi. Dengan meningkatkan faktor dilasi pada beberapa lapisan, model dapat memperluas \textit{receptive field}, yaitu cakupan langkah waktu historis yang dapat memengaruhi representasi keluaran. Mekanisme ini memungkinkan model mempelajari ketergantungan temporal dalam jangkauan lebih panjang tanpa harus menggunakan filter dengan ukuran sangat besar \cite{wu2019graphwavenet}, \cite{oord2016wavenet}.
+
+Untuk kernel berukuran $k$ dengan dilasi $d$, konvolusi kausal pada waktu $t$ menggunakan posisi $t-dj$, dengan $j=0,\ldots,k-1$. Pada tumpukan ber-stride satu, receptive field memenuhi
+\begin{equation}
+ R=1+\sum_{\ell=1}^{L}(k_\ell-1)d_\ell,
+ \label{eq:b2-receptive}
+\end{equation}
+dengan $L$ jumlah lapisan, $k_\ell$ ukuran kernel, dan $d_\ell$ dilasi lapisan ke-$\ell$. Rumus tersebut menyatakan jangkauan indeks waktu, bukan jumlah pengamatan asli yang selalu tersedia \cite{wu2019graphwavenet}, \cite{oord2016wavenet}.
+
+Graph WaveNet menggunakan \textit{gated temporal convolution} untuk mengatur informasi yang diteruskan selama proses pembelajaran. Mekanisme ini melibatkan transformasi nonlinier dan fungsi gerbang yang mengendalikan aliran informasi. Hasil pemodelan temporal tersebut kemudian diproses bersama informasi spasial melalui lapisan konvolusi graf \cite{wu2019graphwavenet}.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{assets/pics/bab2_04_dilasi.png}
+\caption[Pertambahan receptive field untuk kernel berukuran dua dengan dilasi 1 dan 2 pada empat blok]{Pertambahan receptive field untuk kernel berukuran dua dengan dilasi 1 dan 2 pada empat blok. Sumber: diolah dari konfigurasi notebook penelitian.}
+\label{fig:b2-dilasi}
+\label{fig:dilated_causal_convolution}
+\end{figure}
+
+Gambar~\ref{fig:b2-dilasi} menghubungkan konsep receptive field dengan konfigurasi yang digunakan dalam kode. Delapan lapisan memiliki urutan dilasi 1, 2, 1, 2, 1, 2, 1, dan 2. Cakupannya menjadi 13 langkah, sehingga masukan 12 langkah diberi satu padding nol di sisi kiri. Padding tersebut bukan pengamatan lalu lintas tambahan.
+
+\subsection{Graph Convolution}
+\label{subsec:diffusion_graph_convolution}
+\label{subsec:graph_convolution}
+
+\textit{Graph convolution} digunakan untuk mengolah informasi spasial berdasarkan hubungan yang terdapat dalam graf. Pada Graph WaveNet, operasi tersebut menggabungkan informasi dari beberapa simpul melalui proses difusi yang ditentukan oleh matriks hubungan. Pemrosesan dilakukan pada beberapa orde hubungan sehingga model dapat mempertimbangkan informasi dari lingkungan simpul yang lebih luas \cite{wu2019graphwavenet}.
+
+Dalam Graph WaveNet, hubungan spasial dapat diperoleh melalui matriks hubungan yang telah ditentukan maupun matriks adaptif yang dipelajari. Pada graf berarah, informasi dapat diproses melalui hubungan maju dan mundur yang berasal dari representasi adjacency. Selain itu, hubungan adaptif menyediakan mekanisme untuk mempelajari ketergantungan spasial yang tidak selalu tercakup dalam struktur graf awal \cite{wu2019graphwavenet}.
+
+Pada implementasi penelitian, misalkan $X\in\mathbb{R}^{N\times C}$ adalah fitur node pada satu waktu dan $S$ sebuah support berukuran $N\times N$. Propagasi didefinisikan sebagai
+\begin{equation}
+ [\mathcal{P}_{S}(X)]_{j,c}=\sum_{i=1}^{N}X_{i,c}S_{i,j}.
+ \label{eq:b2-propagasi}
+\end{equation}
+Dengan menyatakan fitur simpul sebagai matriks berukuran $N\times C$, operasi propagasi tersebut setara dengan $S^\top X$, sesuai dengan konvensi indeks sumber dan tujuan yang digunakan dalam implementasi penelitian.
+
+Dengan konvensi ini, baris $i$ pada $S$ menyatakan sumber dan kolom $j$ tujuan propagasi. Fitur asli, hasil propagasi orde pertama, dan orde berikutnya pada setiap support digabungkan lalu diproyeksikan ke kanal keluaran. Definisi indeks tersebut mengikuti operasi tensor pada kode; orientasi matriks dapat berbeda pada notasi lain tanpa mengubah tujuan agregasi informasi \cite{wu2019graphwavenet}.
+
+Peran graph convolution dalam penelitian ini adalah mendukung pemrosesan informasi kecepatan dari beberapa koridor selama proses forecasting. Hubungan antarkoridor yang digunakan bergantung pada konfigurasi Fixed, Adaptive, atau Hybrid Graph. Dengan demikian, arsitektur forecasting tetap menggunakan Graph WaveNet, sedangkan sumber informasi hubungan spasial disesuaikan menurut konfigurasi eksperimen.
+
+\subsection{Adaptive Adjacency Matrix}
+\label{subsec:adaptive_adjacency}
+
+\textit{Adaptive adjacency matrix} merupakan mekanisme pembelajaran hubungan antarsimpul yang menjadi salah satu komponen utama Graph WaveNet. Pada metode aslinya, matriks hubungan adaptif dibentuk menggunakan dua matriks \textit{node embedding} yang parameternya dipelajari selama pelatihan. Hasil perkalian kedua embedding diproses menggunakan fungsi aktivasi ReLU dan normalisasi Softmax untuk menghasilkan bobot hubungan adaptif \cite{wu2019graphwavenet}.
+
+Dengan orientasi embedding yang digunakan dalam implementasi, pembentukan matriks adaptif dinyatakan sebagai:
+
+\begin{equation}
+ A_{\mathrm{adp}}=\operatorname{Softmax}_{\mathrm{baris}}\!\left(\operatorname{ReLU}(E_1E_2)\right).
+ \label{eq:b2-adaptive}
+\end{equation}
+
+dengan $A_{\mathrm{adp}}\in\mathbb{R}^{N\times N}$, $E_1\in\mathbb{R}^{N\times d}$, dan $E_2\in\mathbb{R}^{d\times N}$. Besaran $d$ adalah dimensi embedding. Softmax diterapkan per baris sehingga jumlah bobot pada setiap baris bernilai satu. Orientasi $E_2$ mengikuti kode penelitian dan setara dengan penggunaan transpose embedding tujuan berukuran $N\times d$ pada paper \cite{wu2019graphwavenet}.
+
+Matriks adaptif memungkinkan model mempelajari hubungan spasial yang mendukung proses prediksi tanpa harus sepenuhnya bergantung pada hubungan yang telah ditentukan sebelumnya. Namun, bobot yang dipelajari merupakan representasi hubungan dalam model dan tidak dapat langsung ditafsirkan sebagai konektivitas fisik atau hubungan sebab-akibat antarlokasi. Pada formulasi Graph WaveNet asli, matriks adaptif dipelajari dari parameter node dan tidak otomatis berubah untuk setiap waktu pengamatan \cite{wu2019graphwavenet}.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{assets/pics/bab2_05_adaptif.png}
+\caption[Pembentukan adjacency adaptif menggunakan orientasi embedding pada kode penelitian]{Pembentukan adjacency adaptif menggunakan orientasi embedding pada kode penelitian. Sumber: adaptasi konsep \cite{wu2019graphwavenet}.}
+\label{fig:b2-adaptif}
+\end{figure}
+
+Gambar~\ref{fig:b2-adaptif} memperlihatkan alur pembentukan matriks hubungan adaptif. Diagram ini merupakan penjelasan operasi matematis, bukan visualisasi bobot hasil eksperimen.
+
+
+\section{Konfigurasi Representasi Graf pada Graph WaveNet}
+\label{sec:strategi_graph}
+
+\subsection{Fixed Graph}
+\label{subsec:fixed_graph}
+
+\textit{Fixed Graph} merupakan konfigurasi representasi graf yang menggunakan struktur hubungan antarsimpul yang telah ditentukan sebelum proses pelatihan. Pada pemodelan lalu lintas, struktur tersebut dapat dibentuk menggunakan informasi geografis, jarak jaringan jalan, atau informasi konektivitas yang tersedia. Graph WaveNet asli menggunakan matriks hubungan yang telah ditentukan sebagai salah satu sumber informasi spasial dalam eksperimennya \cite{wu2019graphwavenet}.
+
+Dalam penelitian ini, konfigurasi Fixed Graph menggunakan hubungan berdasarkan informasi geografis antarkoridor TomTom. Matriks tersebut berfungsi sebagai representasi awal kedekatan spasial yang dipertahankan selama pelatihan. Kedekatan geografis diperlakukan sebagai proksi hubungan spasial dan tidak secara langsung menunjukkan keberadaan konektivitas fisik antarkoridor.
+
+\subsection{Adaptive Graph}
+\label{subsec:adaptive_graph}
+
+\textit{Adaptive Graph} merupakan konfigurasi yang menggunakan hubungan spasial yang dipelajari dari data selama pelatihan. Pada Graph WaveNet, mekanisme ini memanfaatkan node embedding untuk menghasilkan matriks hubungan adaptif sehingga informasi spasial tidak sepenuhnya bergantung pada struktur yang ditetapkan sebelumnya \cite{wu2019graphwavenet}.
+
+Pembelajaran hubungan adaptif juga menjadi perhatian dalam penelitian model prediksi lalu lintas lainnya. AGCRN mengembangkan mekanisme pembelajaran graf adaptif untuk mengakomodasi hubungan spasial pada data lalu lintas \cite{bai2020agcrn}. Pendekatan tersebut menunjukkan bahwa struktur hubungan spasial dapat menjadi bagian dari parameter yang dipelajari melalui proses optimasi model.
+
+Pada penelitian ini, konfigurasi Adaptive Graph digunakan untuk mengevaluasi forecasting ketika informasi hubungan spasial diperoleh melalui proses pembelajaran model, tanpa menggunakan matriks geografis sebagai sumber hubungan pada operasi spasial yang dibandingkan.
+
+\subsection{Hybrid Graph}
+\label{subsec:hybrid_graph}
+
+\textit{Hybrid Graph} merupakan konfigurasi yang memanfaatkan hubungan spasial yang telah ditentukan dan hubungan adaptif secara bersamaan. Pada Graph WaveNet asli, matriks hubungan adaptif dapat digunakan bersama matriks hubungan yang telah tersedia untuk mendukung pemodelan spasial \cite{wu2019graphwavenet}.
+
+Penelitian lain juga membahas hubungan spasial tetap dan dinamis, misalnya SAGCN-SST yang memadukan perhatian spasial dengan pemodelan temporal \cite{zheng2022dynamic}. Namun, graf adaptif Graph WaveNet pada penelitian ini tidak identik dengan graf dinamis yang berubah mengikuti masukan pada setiap waktu. Adjacency adaptif berasal dari parameter embedding yang dipelajari selama pelatihan.
+
+Dalam penelitian ini, konfigurasi Hybrid Graph menggunakan hubungan geografis dan hubungan adaptif dalam proses forecasting. Konfigurasi tersebut digunakan untuk mengevaluasi hasil prediksi ketika kedua sumber informasi spasial tersedia secara bersamaan. Penelitian tidak mengklaim penggabungan tersebut sebagai arsitektur baru, tetapi menggunakannya sebagai salah satu konfigurasi Graph WaveNet yang diuji.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{assets/pics/bab2_06_konfigurasi.png}
+\caption[Perbedaan sumber matriks hubungan pada konfigurasi Fixed, Adaptive, dan Hybrid]{Perbedaan sumber matriks hubungan pada konfigurasi Fixed, Adaptive, dan Hybrid. Sumber: diolah dari implementasi penelitian.}
+\label{fig:b2-konfigurasi}
+\label{fig:fixed_adaptive_hybrid}
+\end{figure}
+
+Gambar~\ref{fig:b2-konfigurasi} memperjelas bahwa Hybrid menggunakan tiga support, yaitu matriks maju, matriks balik, dan matriks adaptif. Masing-masing dipakai dalam propagasi graf secara terpisah; hasil propagasinya digabungkan pada dimensi fitur dan diproyeksikan. Konfigurasi tersebut tidak dibentuk hanya dengan menjumlahkan adjacency geografis dan adaptif.
+
+
+\section{Model Pembanding Pendukung GC-LSTM-style}
+\label{sec:gclstm}
+
+LSTM merupakan jaringan rekuren yang menggunakan keadaan memori dan mekanisme gerbang untuk mengolah informasi sekuensial \cite{hochreiter1997lstm}. Penggabungan konvolusi graf dengan LSTM telah digunakan untuk memodelkan hubungan spasial dan temporal pada prediksi lalu lintas \cite{bogaerts2020graphcnn}. Dalam rancangan seperti ini, pengolahan graf membentuk representasi antarlokasi, sedangkan LSTM mempelajari urutan representasi tersebut terhadap waktu.
+
+Penelitian ini menggunakan GC-LSTM-style sebagai pembanding pendukung. Istilah tersebut menunjukkan implementasi kombinasi propagasi graf dan LSTM yang digunakan dalam kode, bukan reproduksi persis seluruh rancangan pada artikel \cite{bogaerts2020graphcnn}. Konfigurasi dan kesetaraan prosedur pelatihannya dijelaskan pada Bab 3. Fokus utama tetap pada perbandingan Fixed, Adaptive, dan Hybrid dalam Graph WaveNet.
+
+\section{Pengolahan Data Deret Waktu}
+
+\subsection{Karakteristik Data Deret Waktu}
+
+Data deret waktu atau \textit{time series} merupakan kumpulan observasi yang tersusun berdasarkan urutan waktu. Dalam pemodelan lalu lintas, setiap pengamatan merepresentasikan kondisi lalu lintas pada waktu tertentu. Hubungan antarpengamatan perlu diperhatikan karena nilai pada satu waktu dapat berkaitan dengan nilai pada periode sebelumnya. Karakteristik ketergantungan temporal tersebut menjadi salah satu pertimbangan penting dalam pengembangan dan evaluasi model forecasting \cite{jiang2022gnntraffic}, \cite{cerqueira2020evaluation}.
+
+Data kecepatan lalu lintas dari beberapa koridor dapat direpresentasikan sebagai deret waktu multivariat, dengan setiap koridor memiliki rangkaian nilai kecepatan pada interval pengamatan yang sama. Agar dapat digunakan sebagai masukan model, observasi dari seluruh koridor perlu disusun berdasarkan indeks waktu yang konsisten.
+
+Pada penelitian ini, data historis kecepatan lalu lintas TomTom disusun menggunakan interval satu jam. Setiap titik waktu memuat observasi kecepatan dari koridor yang termasuk dalam dataset penelitian. Data tersebut kemudian digunakan untuk membentuk input window dan target prediksi berdasarkan horizon yang telah ditentukan.
+
+\subsection{Penanganan Missing Values}
+
+\textit{Missing values} merupakan kondisi ketika nilai pengamatan tidak tersedia pada waktu atau lokasi tertentu. Pada data deret waktu lalu lintas, nilai yang tidak tersedia dapat menyebabkan rangkaian observasi menjadi tidak lengkap sehingga diperlukan prosedur penanganan sebelum data digunakan untuk pelatihan atau evaluasi. Pemilihan penanganannya bergantung pada pola kehilangan data dan model yang digunakan \cite{hyndman2021fpp3}.
+
+Salah satu pendekatan penanganan nilai yang tidak tersedia adalah imputasi, yaitu pengisian nilai berdasarkan aturan atau metode tertentu. Metode imputasi dapat memanfaatkan nilai sebelumnya, nilai statistik, maupun pola temporal sesuai kebutuhan pengolahan data. Pemilihan metode harus mempertimbangkan informasi yang tersedia pada saat prediksi agar tidak menggunakan nilai dari masa depan yang belum diketahui.
+
+Dalam penelitian ini, penanganan missing values merupakan bagian dari proses pengolahan data historis TomTom. Prosedur imputasi yang digunakan, jumlah data yang terpengaruh, dan pembentukan input window dijelaskan pada Bab 3. Proporsi data hasil imputasi juga perlu dipertimbangkan dalam pembahasan hasil, karena nilai masukan yang tidak seluruhnya berasal dari pengamatan langsung dapat membatasi interpretasi performa forecasting.
+
+Selain pengisian masukan, ketersediaan target harus dicatat dengan mask. Nilai target yang tidak teramati tidak boleh diperlakukan sebagai pengamatan asli hanya karena telah diisi. Pada evaluasi penelitian ini, mask menentukan pasangan target dan prediksi yang disertakan dalam perhitungan galat. Dengan demikian, imputasi masukan dan pemilihan target evaluasi memiliki fungsi yang berbeda.
+
+\subsection{Pembagian Data dan Normalisasi}
+
+Pembagian dataset bertujuan memisahkan data yang digunakan untuk membangun model dan data yang digunakan untuk mengevaluasi hasilnya. Pada pemodelan deret waktu, ketergantungan antarobservasi menyebabkan pemilihan metode evaluasi perlu dilakukan secara hati-hati. Pendekatan evaluasi yang mengabaikan struktur temporal dapat menghasilkan estimasi performa yang tidak merepresentasikan kemampuan prediksi pada periode mendatang \cite{cerqueira2020evaluation}.
+
+Pembagian secara kronologis merupakan salah satu pendekatan yang digunakan dalam evaluasi deret waktu. Melalui pendekatan tersebut, data pelatihan berasal dari periode lebih awal, sedangkan data validasi dan pengujian berasal dari periode setelahnya. Pemrosesan data juga perlu memastikan bahwa informasi dari periode pengujian tidak digunakan secara tidak semestinya dalam pembentukan model.
+
+Normalisasi merupakan proses transformasi nilai data agar memiliki skala yang sesuai untuk pembelajaran model. Salah satu metode yang umum digunakan adalah standardisasi berdasarkan rata-rata dan standar deviasi data. Parameter transformasi perlu diperoleh dari data pelatihan dan diterapkan secara konsisten pada data validasi maupun pengujian untuk menghindari kebocoran informasi \cite{sklearn2026pitfalls}.
+
+Pada penelitian ini, pembagian data, normalisasi, serta prosedur pembentukan window harus mengikuti urutan waktu yang telah ditentukan. Detail implementasinya, termasuk ukuran setiap bagian dataset dan metode penanganan observasi yang tidak tersedia, disajikan pada Bab 3.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{assets/pics/bab2_07_split.png}
+\caption[Ilustrasi pembagian kronologis berdasarkan rentang waktu berkas praproses]{Ilustrasi pembagian kronologis berdasarkan rentang waktu berkas praproses. Sumber: dataset penelitian; waktu dinyatakan dalam UTC.}
+\label{fig:b2-split}
+\end{figure}
+
+Gambar~\ref{fig:b2-split} memperlihatkan urutan periode pelatihan, validasi, dan pengujian. Rentang tersebut menunjukkan waktu awal dan akhir pada setiap berkas, bukan jaminan bahwa seluruh jam di antaranya tersedia. Penanganan celah waktu, segmentasi, dan pembentukan window dijelaskan pada Bab 3.
+
+
+\section{Evaluasi Model Forecasting}
+\label{sec:evaluasi_model}
+
+\subsection{Mean Absolute Error dan Root Mean Squared Error}
+\label{subsec:mae}
+\label{subsec:rmse}
+
+Evaluasi akurasi dilakukan untuk mengukur perbedaan antara nilai prediksi dan nilai aktual pada data pengujian. Pengukuran kesalahan merupakan bagian penting dalam menilai kualitas forecasting karena setiap model dapat menghasilkan tingkat galat yang berbeda. Pemilihan metrik perlu mempertimbangkan karakteristik data dan cara galat tersebut akan diinterpretasikan \cite{hyndman2006accuracy}.
+
+\textit{Mean Absolute Error} (MAE) merupakan rata-rata nilai absolut selisih antara hasil prediksi dan nilai aktual. MAE memberikan ukuran kesalahan yang mudah diinterpretasikan karena menggunakan satuan yang sama dengan variabel prediksi \cite{hyndman2006accuracy}.
+
+Rumus MAE:
+
+\begin{equation}
+ \operatorname{MAE}_h=\frac{1}{M_h}\sum_{i\in\mathcal{V}_h}|y_{i,h}-\hat{y}_{i,h}|.
+ \label{eq:mae}
+\end{equation}
+
+\textit{Root Mean Squared Error} (RMSE) merupakan akar dari rata-rata kuadrat selisih nilai prediksi dan nilai aktual. Karena kesalahan dikuadratkan sebelum dirata-ratakan, RMSE memberikan penalti yang lebih besar terhadap kesalahan berukuran besar dibandingkan MAE \cite{hyndman2006accuracy}.
+
+Rumus RMSE:
+
+\begin{equation}
+ \operatorname{RMSE}_h=\sqrt{\frac{1}{M_h}\sum_{i\in\mathcal{V}_h}(y_{i,h}-\hat{y}_{i,h})^2}.
+ \label{eq:rmse}
+\end{equation}
+
+Dalam kedua persamaan tersebut, $h\in\{1,3,6\}$ adalah horizon, $\mathcal{V}_h$ adalah himpunan pasangan sampel--koridor dengan target aktual yang valid menurut mask, dan $M_h=|\mathcal{V}_h|$. Notasi $y_{i,h}$ menyatakan kecepatan aktual dan $\hat{y}_{i,h}$ hasil prediksi. Metrik hanya dihitung jika $M_h>0$; jumlah target valid dilaporkan untuk setiap horizon. Semakin kecil nilai MAE dan RMSE, semakin kecil kesalahan prediksi pada kumpulan observasi yang dievaluasi.
+
+Pada penelitian ini, MAE dan RMSE digunakan untuk mengevaluasi prediksi kecepatan lalu lintas pada horizon 1, 3, dan 6 jam. Karena variabel yang diprediksi merupakan kecepatan, hasil evaluasi dilaporkan dalam satuan km/jam setelah prediksi dikembalikan ke skala kecepatan aslinya. Nilai galat dianalisis pada setiap horizon untuk mengamati perubahan performa ketika jarak prediksi bertambah.
+
+Perbandingan nilai galat antarhorizon perlu memperhatikan jumlah dan komposisi target aktual yang digunakan dalam evaluasi. Perbedaan ketersediaan observasi pada setiap horizon dapat menyebabkan himpunan target valid yang dievaluasi tidak sepenuhnya sama. Oleh karena itu, perubahan nilai MAE dan RMSE tidak dapat langsung diartikan hanya sebagai akibat dari bertambahnya jarak prediksi.
+
+\subsection{Variasi Performa Antarpengulangan Pelatihan}
+\label{subsec:random_seed}
+
+Proses pelatihan model pembelajaran mendalam dapat melibatkan sumber keacakan, seperti inisialisasi parameter dan pengacakan urutan data pelatihan. Perbedaan kondisi awal tersebut berpotensi menghasilkan variasi performa meskipun model menggunakan arsitektur dan dataset yang sama \cite{bouthillier2021accounting}.
+
+Salah satu cara mengamati variasi hasil adalah melakukan pelatihan berulang menggunakan \textit{random seed} yang berbeda. Hasil beberapa pengulangan kemudian dapat diringkas menggunakan nilai rata-rata dan standar deviasi. Rata-rata menggambarkan performa umum dari pengulangan yang dilakukan, sedangkan standar deviasi menggambarkan sebaran hasil terhadap rata-rata.
+
+Dalam penelitian ini, evaluasi konsistensi dilakukan melalui lima pengulangan pelatihan menggunakan random seed berbeda pada konfigurasi Fixed Graph, Adaptive Graph, dan Hybrid Graph. Performa setiap pengulangan diukur melalui MAE dan RMSE, kemudian diringkas menggunakan rata-rata dan standar deviasi. Evaluasi ini bertujuan menggambarkan variasi hasil pada pengulangan yang dilakukan dan tidak secara langsung digunakan untuk menyimpulkan signifikansi statistik perbedaan antarmodel. Variasi seed juga tidak menggantikan pengujian pada periode atau wilayah lain.
+
+\subsection{Evaluasi Kebutuhan Komputasi}
+\label{subsec:karakteristik_komputasional}
+
+Selain akurasi prediksi, model forecasting dapat dievaluasi berdasarkan kebutuhan komputasi. Indikator yang digunakan dapat meliputi jumlah parameter model, waktu pelatihan, dan waktu inferensi. Ketiga indikator tersebut memberikan informasi yang berbeda mengenai karakteristik komputasional suatu model.
+
+Jumlah parameter menunjukkan banyaknya nilai parameter yang tersimpan dalam model. Parameter yang diperbarui oleh optimasi perlu dibedakan dari parameter non-trainable, misalnya statistik pada normalisasi batch. Penghitungan pada notebook menggunakan total parameter model; karena itu, istilah jumlah parameter tidak dibatasi hanya pada parameter trainable. Waktu pelatihan menggambarkan durasi proses optimasi parameter menggunakan data pelatihan, sedangkan waktu inferensi menunjukkan waktu yang diperlukan model terlatih untuk menghasilkan prediksi dari data masukan.
+
+Evaluasi kebutuhan komputasi juga digunakan dalam penelitian Graph WaveNet asli. Pada eksperimen tersebut, waktu pelatihan dan waktu inferensi dibandingkan dengan beberapa model prediksi lalu lintas lainnya untuk menunjukkan karakteristik komputasi arsitektur yang digunakan \cite{wu2019graphwavenet}.
+
+Dalam penelitian ini, kebutuhan komputasi dievaluasi menggunakan jumlah parameter, waktu pelatihan, dan waktu inferensi. Hasil pengukuran perlu diinterpretasikan dengan memperhatikan lingkungan perangkat keras, ukuran data, konfigurasi batch, dan prosedur pengukuran karena faktor-faktor tersebut dapat memengaruhi waktu yang diperoleh. Waktu pelatihan total dipengaruhi jumlah epoch yang dijalankan, sehingga waktu per epoch juga perlu diperhatikan. Waktu inferensi per sampel yang diperoleh dari pemrosesan batch tidak sama dengan latensi satu permintaan pada sistem operasional.
+
+\subsection{Scalability Berdasarkan Jumlah Node}
+\label{subsec:graph_scalability}
+
+\textit{Scalability} dalam konteks penelitian ini berkaitan dengan perubahan kebutuhan komputasi ketika jumlah simpul atau koridor yang diproses model bertambah. Pada model berbasis graf, pertambahan jumlah simpul dapat memengaruhi ukuran data masukan serta jumlah hubungan spasial yang perlu diproses. Karakteristik perubahan tersebut bergantung pada rancangan arsitektur dan representasi graf yang digunakan.
+
+Pada Graph WaveNet, adaptive adjacency dibentuk menggunakan matriks node embedding yang ukurannya bergantung pada jumlah simpul. Oleh karena itu, pertambahan node dapat memengaruhi ukuran komponen yang berkaitan dengan pembelajaran hubungan adaptif. Namun, perubahan jumlah simpul tidak berarti seluruh parameter arsitektur meningkat dengan proporsi yang sama \cite{wu2019graphwavenet}.
+
+Dalam penelitian ini, evaluasi perubahan ukuran graf dilakukan khusus pada model Hybrid Graph WaveNet dengan jumlah simpul 8, 16, 32, dan 64. Pengujian dilakukan dengan melatih model untuk setiap ukuran graf, kemudian mencatat jumlah parameter, waktu pelatihan, dan waktu inferensi. Hasil tersebut digunakan untuk mengamati perubahan kebutuhan komputasi pada skenario pengujian yang tersedia.
+
+Perubahan jumlah simpul juga dapat menyebabkan perubahan komposisi koridor dan karakteristik data yang diproses. Oleh karena itu, perbandingan performa prediksi antarukuran graf perlu ditafsirkan secara terbatas. Pengujian ini tidak secara langsung mengevaluasi kemampuan model yang telah dilatih pada satu ukuran graf untuk menerima simpul baru tanpa penyesuaian atau pelatihan ulang.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{assets/pics/bab2_08_subset.png}
+\caption[Ilustrasi subset bertingkat 8, 16, 32, dan 64 koridor]{Ilustrasi subset bertingkat 8, 16, 32, dan 64 koridor. Sumber: koordinat dataset dan urutan node pada notebook pengujian ukuran graf.}
+\label{fig:b2-subset}
+\end{figure}
+
+Gambar~\ref{fig:b2-subset} menggunakan koordinat asli dengan subset yang saling mencakup. Node pusat ditandai dengan bintang. Gambar hanya menjelaskan pertambahan cakupan node; hasil pengukuran parameter dan runtime disajikan pada bab hasil penelitian.
+
+
+\section{Penelitian Terdahulu dan Posisi Penelitian}
+\label{sec:penelitian_terkait}
+
+\subsection{Penelitian Terdahulu}
+
+Penelitian prediksi lalu lintas berbasis pembelajaran mendalam telah mengembangkan berbagai pendekatan untuk mempelajari hubungan spasial dan temporal. STGCN menggunakan konvolusi graf dan konvolusi temporal dalam arsitektur berbasis konvolusi untuk memodelkan data lalu lintas \cite{yu2018stgcn}. DCRNN memanfaatkan konvolusi difusi dan jaringan rekuren untuk melakukan prediksi pada data yang direpresentasikan sebagai graf \cite{li2018dcrnn}.
+
+Graph WaveNet mengembangkan pemodelan spasial-temporal melalui kombinasi graph convolution, dilated causal convolution, dan pembelajaran adaptive adjacency. Penelitian tersebut mengevaluasi model menggunakan dataset METR-LA dan PEMS-BAY serta membandingkan sejumlah konfigurasi hubungan spasial \cite{wu2019graphwavenet}.
+
+Pendekatan lain juga dikembangkan untuk mempelajari ketergantungan spasial-temporal. AGCRN menggunakan mekanisme graf adaptif untuk mendukung pembelajaran hubungan spasial \cite{bai2020agcrn}. Model berbasis kombinasi graph convolution dan LSTM juga digunakan dalam penelitian prediksi lalu lintas jangka pendek dan jangka panjang \cite{bogaerts2020graphcnn}. Selain itu, pendekatan berbasis attention telah digunakan untuk mempelajari hubungan spasial-temporal dalam prediksi lalu lintas \cite{guo2019astgcn}, \cite{zheng2020gman}.
+
+Penelitian mengenai jaringan jalan berskala besar juga memperhatikan hubungan spasial yang bersifat tetap dan dinamis \cite{zheng2022dynamic}. Perbedaan tersebut menunjukkan bahwa istilah graf adaptif dan graf dinamis perlu digunakan sesuai mekanisme setiap model.
+
+Ringkasan penelitian terdahulu yang relevan dengan penelitian ini disajikan pada Tabel 2.1.
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.19\linewidth}>{\raggedright\arraybackslash}p{0.33\linewidth}>{\raggedright\arraybackslash}p{0.36\linewidth}}
+\caption{Penelitian terdahulu dan kaitannya dengan rancangan evaluasi}\label{tab:b2-penelitian}\label{tab:penelitian_terdahulu}\\
+\hline
+\textbf{Penelitian} & \textbf{Pendekatan dan cakupan} & \textbf{Kaitan dan perbedaan fokus} \\
+\hline
+\endfirsthead
+\multicolumn{3}{l}{\small Tabel \thetable\ (lanjutan)}\\
+\hline
+\textbf{Penelitian} & \textbf{Pendekatan dan cakupan} & \textbf{Kaitan dan perbedaan fokus} \\
+\hline
+\endhead
+STGCN \cite{yu2018stgcn} & Konvolusi graf dan temporal dalam arsitektur konvolusional. & Dasar pemodelan spasial-temporal; penelitian ini mengevaluasi konfigurasi hubungan pada Graph WaveNet. \\
+DCRNN \cite{li2018dcrnn} & Difusi berarah dan encoder--decoder rekuren. & Dasar propagasi maju dan balik; pemodelan temporal penelitian ini memakai konvolusi berdilatasi. \\
+Graph WaveNet \cite{wu2019graphwavenet} & Graf tetap dan adaptif; METR-LA dan PEMS-BAY berinterval 5 menit, evaluasi 15, 30, dan 60 menit. & Arsitektur utama; penelitian ini memakai TomTom per jam dengan horizon 1, 3, dan 6 jam serta evaluasi variasi seed dan ukuran graf. \\
+AGCRN \cite{bai2020agcrn} & Pembelajaran graf dan parameter spesifik node dalam model rekuren. & Mendukung landasan hubungan yang dipelajari; bukan arsitektur yang direplikasi dalam eksperimen utama. \\
+SAGCN-SST \cite{zheng2022dynamic} & Perhatian spasial dan seq2seq untuk hubungan spasial-temporal pada jaringan Seattle dan Los Angeles. & Menjelaskan hubungan dinamis; adjacency adaptif pada penelitian ini tetap untuk checkpoint yang sama. \\
+Graph CNN-LSTM \cite{bogaerts2020graphcnn} & Penggabungan konvolusi graf dan LSTM pada prediksi lalu lintas berbasis data trajektori. & Landasan model pembanding pendukung; implementasi GC-LSTM-style tidak diklaim sebagai reproduksi persis model tersebut. \\
+\hline
+\end{longtable}
+\endgroup
+
+Tabel~\ref{tab:b2-penelitian} membandingkan fokus dan mekanisme model, bukan mengurutkan keunggulan akurasi. Nilai galat antarartikel tidak dibandingkan langsung karena sumber data, interval waktu, dan prosedur evaluasinya berbeda. Perbedaan fokus pada tabel juga tidak berarti setiap artikel sama sekali tidak membahas aspek lain.
+
+\subsection{Posisi Penelitian}
+
+
+Berdasarkan penelitian terdahulu, penggunaan Graph Neural Network untuk traffic forecasting telah berkembang melalui berbagai arsitektur dan mekanisme pemodelan hubungan spasial-temporal. Penggunaan adaptive adjacency dan kombinasi hubungan graf yang telah ditentukan dengan hubungan yang dipelajari juga telah diteliti sebelumnya \cite{wu2019graphwavenet}, \cite{bai2020agcrn}, \cite{zheng2022dynamic}. Oleh karena itu, penelitian ini tidak menempatkan penggunaan Fixed, Adaptive, dan Hybrid Graph sebagai pengembangan arsitektur baru.
+
+Penelitian ini berfokus pada implementasi dan evaluasi Graph WaveNet untuk memprediksi kecepatan lalu lintas pada horizon 1, 3, dan 6 jam menggunakan data historis TomTom pada 64 koridor. Evaluasi dilakukan untuk memberikan hasil empiris pada karakteristik sumber data dan resolusi temporal yang digunakan dalam penelitian.
+
+Konfigurasi Fixed Graph, Adaptive Graph, dan Hybrid Graph digunakan sebagai variasi representasi spasial dalam proses forecasting. Perbedaan hasil ketiga konfigurasi dianalisis berdasarkan akurasi dan variasi performa antarpengulangan pelatihan. Selain itu, penelitian mengevaluasi perubahan jumlah parameter, waktu pelatihan, dan waktu inferensi pada Hybrid Graph WaveNet untuk ukuran 8, 16, 32, dan 64 koridor.
+
+Celah empiris yang ditangani adalah kebutuhan bukti mengenai perilaku Graph WaveNet pada sumber data TomTom beresolusi satu jam dalam rancangan eksperimen penelitian ini. Hasil pada benchmark berinterval lima menit tidak langsung menjawab performa pada horizon satu sampai enam jam, karena resolusi, ketersediaan observasi, dan karakteristik koridornya berbeda. Oleh karena itu, penelitian menguji tiga aspek yang saling melengkapi: galat menurut horizon, perbedaan konfigurasi beserta variasi antar-seed, dan kebutuhan komputasi ketika jumlah koridor bertambah. Kontribusi dibatasi pada evaluasi empiris tersebut, tanpa mengklaim bahwa konfigurasi graf atau pengujian skalabilitas merupakan metode baru.

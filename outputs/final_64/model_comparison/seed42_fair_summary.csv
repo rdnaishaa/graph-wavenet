@@ -1,0 +1,5 @@
+model,avg_mae,avg_rmse,parameters,best_epoch_benchmark,mean_sec_per_epoch,total_training_time_sec,inference_ms_per_sample
+Fixed GWN,2.5504,4.0551,276291,63,3.2293,284.67,3.5501
+Adaptive GWN,2.4406,3.9619,261187,67,2.906,267.87,3.1898
+Hybrid GWN,2.3053,3.8094,293955,80,3.8203,401.62,3.2875
+GC-LSTM,2.3054,3.819,553472,65,0.254,23.08,0.371

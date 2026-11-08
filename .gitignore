@@ -1,0 +1,45 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Virtual environments
+.venv/
+.venv_old/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Cache
+.cache/
+.ipynb_checkpoints/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Local runtime state
+streamlit_app/data/*.db*
+.env.example.local
+.ruff_cache/
+.pytest_cache/
+
+# Private raw input and live session data (not part of a new checkout)
+data_update_dosen/
+data/collected/
+
+# Local Overleaf screenshots
+outputs/thesis/**/overleaf*.png

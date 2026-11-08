@@ -1,0 +1,256 @@
+%-----------------------------------------------------------------------------%
+\chapter{\babTiga}
+\label{cha:metodologi}
+\label{cha:metodologi_penelitian}
+%-----------------------------------------------------------------------------%
+
+Bab ini menjelaskan metodologi yang digunakan untuk mengimplementasikan dan mengevaluasi Graph WaveNet dalam prediksi kecepatan lalu lintas multi-horizon. Tahapan penelitian meliputi penyiapan data historis TomTom, prapemrosesan data, pembentukan representasi graf, implementasi model, pelatihan, serta evaluasi performa prediksi dan kebutuhan komputasi. Penjelasan metodologi disusun berdasarkan prosedur eksperimen yang digunakan agar hasil penelitian dapat ditelusuri dan direproduksi.
+
+%-----------------------------------------------------------------------------%
+\section{Alur Penelitian}
+\label{sec:alur_penelitian}
+%-----------------------------------------------------------------------------%
+
+Penelitian ini menggunakan pendekatan kuantitatif dengan metode eksperimental-komparatif untuk mengevaluasi performa prediksi kecepatan lalu lintas menggunakan Graph WaveNet. Eksperimen dilakukan dengan menerapkan tiga konfigurasi representasi graf, yaitu \textit{Fixed Graph}, \textit{Adaptive Graph}, dan \textit{Hybrid Graph}. Ketiga konfigurasi tersebut menggunakan arsitektur dasar Graph WaveNet dengan perbedaan pada sumber hubungan spasial yang digunakan selama proses pemodelan.
+
+Secara umum, penelitian dimulai dari penyiapan data historis kecepatan lalu lintas TomTom pada 64 koridor. Data kemudian diperiksa berdasarkan kelengkapan observasi, keteraturan waktu, dan identitas koridor. Setelah itu, dilakukan prapemrosesan untuk menyusun data pada interval waktu satu jam, menangani nilai yang tidak tersedia, serta membentuk pasangan masukan dan target prediksi. Setiap masukan terdiri atas 12 observasi historis, sedangkan target yang diprediksi adalah kecepatan lalu lintas pada horizon 1, 3, dan 6 jam ke depan.
+
+Tahap berikutnya adalah pembentukan representasi graf untuk menggambarkan hubungan antarkoridor. Pada konfigurasi \textit{Fixed Graph}, hubungan spasial diperoleh berdasarkan kedekatan geografis antarkoridor. Konfigurasi \textit{Adaptive Graph} menggunakan hubungan yang dipelajari dari data selama proses pelatihan. Sementara itu, konfigurasi \textit{Hybrid Graph} memanfaatkan hubungan geografis dan hubungan adaptif secara bersamaan. Ketiga konfigurasi tersebut digunakan untuk menghasilkan prediksi dengan rancangan data masukan dan target yang sama.
+
+Setelah model diimplementasikan, proses pelatihan dan validasi dilakukan menggunakan pembagian data secara kronologis. Setiap konfigurasi Graph WaveNet dilatih melalui lima pengulangan dengan \textit{random seed} berbeda untuk mengamati variasi performa akibat proses pelatihan. Model yang telah dilatih kemudian dievaluasi menggunakan \textit{Mean Absolute Error} (MAE) dan \textit{Root Mean Squared Error} (RMSE) pada masing-masing horizon prediksi. Hasil pengulangan dirangkum menggunakan rata-rata dan standar deviasi untuk memberikan gambaran performa serta konsistensi hasil.
+
+Selain evaluasi akurasi, penelitian juga mengukur kebutuhan komputasi melalui jumlah parameter, waktu pelatihan, dan waktu inferensi. Pengujian perubahan ukuran graf dilakukan pada model \textit{Hybrid Graph WaveNet} dengan jumlah koridor 8, 16, 32, dan 64. Pada setiap ukuran graf, model dilatih ulang untuk mengamati perubahan kebutuhan komputasi dalam lingkungan pengujian yang digunakan. Model GC-LSTM-\textit{style} disertakan sebagai pembanding pendukung, sedangkan fokus utama analisis tetap pada tiga konfigurasi Graph WaveNet.
+
+Hasil seluruh pengujian kemudian dianalisis untuk menjawab rumusan masalah penelitian. Analisis mencakup performa forecasting pada horizon yang berbeda, perbandingan konfigurasi representasi graf, variasi hasil antarpengulangan pelatihan, dan perubahan kebutuhan komputasi seiring bertambahnya jumlah koridor. Alur keseluruhan tahapan penelitian disajikan pada Gambar~\ref{fig:b3-alur-penelitian}.
+
+\begin{figure}[htbp]
+\centering
+\normalsize
+\begin{tabular}{c}
+\fbox{\parbox{0.82\linewidth}{\centering Arsip TomTom: 96 koridor\\Seleksi 64 koridor berdasarkan timestamp unik}}\\[3pt]
+$\downarrow$\\[3pt]
+\fbox{\parbox{0.82\linewidth}{\centering Penyelarasan grid waktu, mask observasi, penanganan gap,\\segmentasi, pembagian kronologis, normalisasi, dan window}}\\[3pt]
+$\downarrow$\\[3pt]
+\fbox{\parbox{0.82\linewidth}{\centering Graph WaveNet\\Fixed (geografis) $\mid$ Adaptive (dipelajari) $\mid$ Hybrid (keduanya)}}\\[3pt]
+$\downarrow$\\[3pt]
+\fbox{\parbox{0.82\linewidth}{\centering Pelatihan dan validasi; prediksi horizon 1, 3, dan 6 jam\\Evaluasi MAE/RMSE pada target valid dan variasi lima seed}}\\[3pt]
+$\downarrow$\\[3pt]
+\fbox{\parbox{0.82\linewidth}{\centering Analisis hasil; pengujian komputasi Hybrid pada 8--64 node\\GC-LSTM-style sebagai pembanding pendukung}}
+\end{tabular}
+\caption{Alur penelitian dan cakupan evaluasi. Sumber: disusun berdasarkan pipeline penelitian.}
+\label{fig:b3-alur-penelitian}
+\end{figure}
+
+%-----------------------------------------------------------------------------%
+\section{Dataset dan Karakteristik Data TomTom}
+\label{sec:dataset_tomtom}
+%-----------------------------------------------------------------------------%
+
+\subsection{Sumber dan Perolehan Data}
+\label{subsec:sumber_data}
+%-----------------------------------------------------------------------------%
+
+Data yang digunakan dalam penelitian ini berasal dari TomTom Traffic API, khususnya layanan \textit{Flow Segment Data}. Layanan tersebut menyediakan informasi kondisi lalu lintas pada segmen jalan yang berada di sekitar koordinat permintaan, termasuk kecepatan lalu lintas saat pengambilan data dan kecepatan pada kondisi arus bebas. Data diperoleh melalui permintaan API berdasarkan titik koordinat yang telah ditentukan \cite{tomtomflowapi}.
+
+Layanan \textit{Flow Segment Data} menyediakan kondisi lalu lintas pada saat permintaan dilakukan. Oleh karena itu, data historis yang digunakan dalam penelitian ini diperoleh melalui pengumpulan dan penyimpanan hasil pengamatan secara berkala. Setiap hasil pengambilan data disertai informasi waktu pencatatan sehingga observasi dari beberapa periode dapat disusun menjadi deret waktu. Dengan demikian, data historis pada penelitian ini merupakan hasil akumulasi pengamatan, bukan keluaran prediksi yang disediakan oleh TomTom.
+
+Berkas hasil pengumpulan memuat informasi identitas koridor, waktu pengamatan, serta sejumlah atribut kondisi lalu lintas. Variabel utama yang digunakan untuk pemodelan adalah \textrm{current\_speed}, yaitu kecepatan lalu lintas dalam satuan kilometer per jam. Informasi koordinat geografis digunakan untuk membentuk hubungan spasial pada konfigurasi graf yang memerlukan matriks hubungan geografis.
+
+Pemilihan koridor dilakukan dari 96 berkas koridor yang tersedia. Timestamp yang tidak valid dibuang, kemudian data diurutkan dan timestamp duplikat dihapus dengan mempertahankan catatan terakhir. Koridor diurutkan berdasarkan jumlah timestamp unik secara menurun; jika jumlahnya sama, nama berkas digunakan sebagai pengurut secara menaik. Sebanyak 64 koridor teratas ditetapkan sebagai dataset eksperimen. Kriteria ini menunjukkan banyaknya waktu pencatatan, bukan jaminan bahwa setiap nilai kecepatan valid. Seleksi menggunakan arsip yang tersedia secara keseluruhan, sehingga tidak ditafsirkan sebagai seleksi daring yang hanya menggunakan periode pelatihan. Data dari koridor tersebut disusun untuk membentuk satu dataset multivariat yang digunakan secara konsisten pada proses pelatihan dan evaluasi Graph WaveNet.
+
+\subsection{Cakupan Spasial dan Variabel Penelitian}
+\label{subsec:cakupan_spasial}
+%-----------------------------------------------------------------------------%
+
+Cakupan spasial penelitian meliputi 64 koridor pengamatan lalu lintas di wilayah Jakarta dan sekitarnya dalam kawasan Jabodetabek. Setiap koridor memiliki identitas dan titik koordinat geografis yang digunakan sebagai referensi lokasi. Pada representasi graf, satu koridor dinyatakan sebagai satu simpul atau \textit{node}, sehingga dataset utama membentuk graf dengan 64 simpul.
+
+Identitas dan koordinat disimpan terpisah dalam berkas metadata \textrm{corridors.csv}; atribut tersebut tidak seluruhnya menjadi kolom pada berkas observasi per koridor. Informasi koordinat terdiri atas \textit{latitude} dan \textit{longitude}. Kedua atribut tersebut digunakan untuk menghitung jarak geografis antarkoridor sebagai dasar pembentukan \textit{Fixed Graph}. Jarak tersebut merepresentasikan kedekatan geografis antara titik pengamatan dan tidak secara langsung menunjukkan panjang rute perjalanan atau konektivitas fisik jaringan jalan.
+
+Variabel prediksi dalam penelitian ini adalah kecepatan lalu lintas yang diperoleh dari atribut \textrm{current\_speed}. Nilai tersebut digunakan sebagai fitur utama pada masukan model sekaligus sebagai target forecasting. Variabel lain, seperti kecepatan arus bebas, waktu tempuh, dan indikator kepercayaan, tersimpan dalam arsip tetapi tidak dimasukkan sebagai fitur masukan model. Atribut turunan \textrm{congestion\_ratio} ikut diperiksa pada prapemrosesan dan penentuan waktu valid, meskipun tensor masukan model hanya menggunakan \textrm{current\_speed}.
+
+Secara umum, atribut yang berkaitan dengan penyusunan dataset penelitian ditunjukkan pada Tabel~\ref{tab:b3-atribut-data}.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Atribut data yang digunakan dalam penelitian}
+    \label{tab:b3-atribut-data}
+    \normalsize
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{0.29\linewidth}>{\raggedright\arraybackslash}p{0.61\linewidth}}
+        \hline
+        \textbf{Atribut} & \textbf{Keterangan} \\
+        \hline
+        \textrm{station\_id} &
+        Identitas koridor pada metadata lokasi; pada data olahan digunakan \textrm{corridor\_file} dan indeks \textrm{node\_index}. \\
+        
+        \textrm{obs\_time\_utc} &
+        Waktu pencatatan observasi dalam UTC. \\
+        
+        \textrm{current\_speed} &
+        Kecepatan lalu lintas yang digunakan sebagai fitur dan target prediksi, dalam km/jam. \\
+        
+        \textrm{lat} &
+        Koordinat lintang titik pengamatan koridor. \\
+        
+        \textrm{lon} &
+        Koordinat bujur titik pengamatan koridor. \\
+        \hline
+    \end{tabular}
+\end{table}
+
+Pada tahap pemodelan, urutan identitas koridor ditetapkan secara konsisten agar posisi setiap simpul pada data kecepatan sesuai dengan posisi simpul dalam matriks adjacency. Konsistensi tersebut diperlukan karena pertukaran urutan koridor tanpa penyesuaian matriks hubungan dapat menyebabkan informasi spasial diterapkan pada simpul yang tidak sesuai.
+
+Koordinat 64 titik pengamatan berada pada rentang lintang $-6{,}500$ hingga $-6{,}108$ dan bujur $106{,}590$ hingga $107{,}095$ derajat. Sebaran titik dan subset eksperimen ditunjukkan pada Gambar~\ref{fig:b2-subset}. Titik tersebut merupakan referensi permintaan data, bukan representasi seluruh geometri segmen jalan.
+
+
+
+\subsection{Cakupan Temporal dan Karakteristik Data}
+\label{subsec:cakupan_temporal}
+%-----------------------------------------------------------------------------%
+
+Data penelitian disusun sebagai deret waktu dengan resolusi temporal satu jam. Berdasarkan irisan rentang waktu 64 berkas koridor dan pemeriksaan dataset olahan, rentang waktu yang digunakan adalah 12 Agustus 2026 pukul 04.00 UTC hingga 11 September 2026 pukul 12.00 UTC. Rentang tersebut mencakup 729 posisi waktu pada grid satu jam. Namun, jumlah posisi waktu pada grid tidak berarti seluruh pengamatan tersedia secara lengkap pada setiap koridor.
+
+Setiap koridor memiliki rangkaian nilai kecepatan yang disusun berdasarkan waktu pencatatan. Seluruh koridor kemudian disejajarkan pada indeks waktu yang sama agar model dapat memproses kondisi lalu lintas dari beberapa lokasi secara bersamaan. Proses penyelarasan tersebut diperlukan karena data berasal dari hasil pengambilan API secara berkala, sehingga waktu pengamatan dan ketersediaan data dapat berbeda antarkoridor.
+
+Pada data historis, terdapat kemungkinan nilai pengamatan tidak tersedia pada jam tertentu. Kondisi tersebut dapat terjadi ketika hasil pengambilan data tidak tercatat atau ketika pengamatan tidak memenuhi ketentuan pengolahan data yang digunakan. Oleh karena itu, dataset perlu diperiksa berdasarkan kelengkapan observasi, keberadaan waktu yang tidak tersedia, dan kesinambungan urutan temporal sebelum digunakan sebagai masukan model.
+
+Data kecepatan dari seluruh koridor selanjutnya disusun menjadi representasi multivariat. Pada setiap langkah waktu, tersedia satu posisi nilai kecepatan untuk setiap koridor. Untuk eksperimen utama, masukan model dibentuk menggunakan 12 langkah waktu historis dari 64 koridor dengan satu fitur kecepatan, sehingga setiap sampel memiliki dimensi $12\times64\times1$. Target prediksi memiliki dimensi $3\times64$, yang merepresentasikan tiga horizon prediksi untuk seluruh koridor.
+
+Karakteristik umum dataset yang digunakan dalam penelitian dirangkum pada Tabel~\ref{tab:b3-karakteristik-data}.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Karakteristik dataset penelitian}
+    \label{tab:b3-karakteristik-data}
+    \normalsize
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{0.42\linewidth}>{\raggedright\arraybackslash}p{0.48\linewidth}}
+        \hline
+        \textbf{Karakteristik} & \textbf{Keterangan} \\
+        \hline
+        Sumber data & TomTom Traffic API \\
+        
+        Wilayah pengamatan & Jabodetabek \\
+        
+        Jumlah koridor & 64 \\
+        
+        Resolusi temporal & 1 jam \\
+        
+        Periode dataset & 12 Agustus--11 September 2026 (UTC) \\
+        
+        Panjang grid waktu & 729 posisi waktu \\
+        
+        Variabel prediksi & \textrm{current\_speed} (km/jam) \\
+        
+        Panjang masukan & 12 langkah waktu \\
+        
+        Horizon prediksi & 1, 3, dan 6 jam \\
+        
+        Dimensi masukan per sampel & $12\times64\times1$ \\
+        
+        Dimensi target per sampel & $3\times64$ \\
+        \hline
+    \end{tabular}
+\end{table}
+
+Jumlah observasi valid pada dataset dapat berbeda dari jumlah seluruh posisi pada grid waktu. Oleh karena itu, tahap prapemrosesan dilakukan untuk menangani ketidakteraturan pengamatan dan membentuk pasangan masukan serta target yang memenuhi ketentuan eksperimen. Aspek yang perlu diperhatikan meliputi penanganan missing values, penyimpanan mask observasi, pembagian data secara kronologis, normalisasi, dan pembentukan sliding window.
+
+\section{Prapemrosesan dan Pembentukan Data Forecasting}
+\label{sec:b3-prapemrosesan}
+
+Prapemrosesan menyusun arsip observasi menjadi tensor masukan dan target yang memiliki urutan waktu serta urutan koridor yang konsisten. Urutan implementasinya adalah pemeriksaan timestamp dan penyelarasan grid, penyimpanan mask observasi, pengisian gap terisolasi, penentuan waktu valid dan segmen, pembagian kronologis, standardisasi berdasarkan data pelatihan, kemudian pembentukan window pada masing-masing pembagian data. Penanganan gap dan segmentasi dilakukan sebelum pembagian data; prosedur ini perlu dibedakan dari normalisasi yang statistiknya hanya dihitung pada data pelatihan.
+
+\subsection{Pemeriksaan dan Penyelarasan Data Temporal}
+\label{subsec:b3-penyelarasan}
+
+Kolom waktu observasi dikonversi menjadi timestamp dengan zona waktu UTC. Catatan yang timestamp-nya tidak dapat dikonversi dibuang. Data setiap koridor kemudian diurutkan berdasarkan waktu, dan timestamp duplikat ditangani dengan mempertahankan catatan terakhir. Pemeriksaan ini menyelaraskan identitas waktu; keberadaan timestamp tidak dengan sendirinya menunjukkan bahwa nilai kecepatan tersedia.
+
+Rentang bersama ditentukan menggunakan waktu mulai paling akhir dan waktu selesai paling awal di antara 64 koridor. Berdasarkan rentang tersebut dibentuk grid berinterval satu jam yang berisi 729 posisi waktu. Setiap deret koridor kemudian disejajarkan terhadap grid melalui reindexing. Proses ini tidak menghitung rata-rata kecepatan per jam dan tidak melakukan interpolasi; posisi yang tidak mempunyai catatan pada timestamp grid menjadi nilai hilang.
+
+Sebelum imputasi, atribut is\_observed disimpan untuk setiap pasangan waktu--koridor. Nilainya benar apabila current\_speed tidak kosong pada posisi tersebut, dan salah apabila nilainya hilang. Mask ini menunjukkan ketersediaan kecepatan pada arsip, bukan hasil pengujian menyeluruh atas akurasi pengukuran TomTom. Sebanyak 24.967 dari 46.656 posisi waktu--koridor memiliki kecepatan terobservasi, sedangkan 21.689 posisi tidak tersedia sebelum imputasi. Angka tersebut menghitung pasangan waktu--koridor, bukan jumlah jam unik.
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=\linewidth,height=0.78\textheight,keepaspectratio]{assets/pics/bab3_03_missing_heatmap.png}
+\caption[Ketersediaan observasi kecepatan sebelum imputasi]{Ketersediaan observasi kecepatan sebelum imputasi pada 64 koridor. Panel kanan memperbesar 48 jam pertama agar pola ketersediaan per jam terbaca. Sumber: mask is\_observed pada dataset penelitian, diverifikasi terhadap arsip mentah.}
+\label{fig:b3-ketersediaan}
+\end{figure}
+
+Gambar~\ref{fig:b3-ketersediaan} menunjukkan posisi observasi asli dan nilai yang hilang. Pola kehilangan yang serupa antarkoridor perlu diperhatikan karena pemeriksaan gap pada pipeline dilakukan pada tingkat jaringan. Seleksi 64 koridor yang dijelaskan sebelumnya menggunakan jumlah timestamp pada seluruh arsip, termasuk periode setelah pelatihan. Dengan demikian, sampel koridor bersifat retrospektif dan hasilnya dibatasi pada jaringan terpilih. Hal ini tidak sama dengan memasukkan nilai target pengujian sebagai fitur, tetapi membatasi klaim generalisasi terhadap koridor baru atau pemilihan jaringan secara daring.
+
+\subsection{Penanganan Missing Values dan Segmentasi Temporal}
+\label{subsec:b3-imputasi}
+
+Status kelengkapan pada suatu jam ditentukan dari mask kecepatan seluruh koridor. Suatu jam dinyatakan lengkap apabila semua koridor memiliki current\_speed terobservasi. Jam yang tidak lengkap menjadi kandidat gap satu jam terisolasi hanya jika jam tepat sebelumnya dan tepat sesudahnya sama-sama lengkap. Pada grid penelitian terdapat 320 jam yang memenuhi aturan kandidat tersebut. Jumlah ini bukan jumlah nilai yang diisi, sebab satu jam dapat mencakup lebih dari satu koridor.
+
+Pada jam kandidat, nilai yang hilang pada current\_speed dan congestion\_ratio diisi menggunakan nilai atribut yang sama dari jam tepat sebelumnya pada koridor yang sama. Nilai yang sudah tersedia dipertahankan. Proses ini menggunakan pergeseran satu langkah dari deret sebelum pengisian, bukan pengisian berantai tanpa batas. Atribut was\_imputed ditandai benar apabila salah satu dari kedua atribut diisi; oleh karena itu, indikator tersebut tidak selalu berarti nilai kecepatanlah yang diimputasi. Mask is\_observed tetap mempertahankan status kecepatan sebelum pengisian.
+
+Nilai pengganti berasal dari masa lalu sehingga tidak menggunakan kecepatan pada jam sesudahnya. Namun, keputusan apakah suatu gap boleh diisi menggunakan informasi ketersediaan observasi pada jam sesudahnya. Dengan demikian, aturan pemilihan gap bersifat retrospektif dan keseluruhan prosedur tidak dinyatakan sepenuhnya kausal untuk penggunaan daring. Masking target mencegah nilai kecepatan hasil imputasi diperlakukan sebagai target terobservasi, tetapi tidak menghilangkan keterbatasan aturan pemilihan gap ini.
+
+Setelah pengisian, suatu timestamp dinyatakan valid untuk pembentukan matriks apabila current\_speed dan congestion\_ratio tidak kosong pada seluruh 64 koridor. Congestion\_ratio tidak menjadi fitur masukan model, tetapi ketidaktersediaannya dapat menggugurkan timestamp untuk seluruh jaringan. Kriteria tersebut memeriksa keberadaan nilai, bukan ambang confidence atau rentang kecepatan. Pemeriksaan ulang dataset menunjukkan bahwa pada artefak saat ini tidak ada timestamp tambahan yang gugur hanya akibat congestion\_ratio ketika seluruh kecepatan sudah tersedia.
+
+Timestamp yang masih tidak valid tidak dimasukkan ke matriks pemodelan. Waktu valid yang berurutan dengan selisih tepat satu jam dikelompokkan dalam segmen yang sama; segmen baru dimulai ketika kesinambungan tersebut terputus. Dari 729 posisi waktu, sebanyak 710 waktu memenuhi kriteria validitas dan membentuk 10 segmen. Sebanyak 19 waktu yang tidak valid tetap dapat tercatat dalam berkas grid dengan identitas segmen kosong. Dengan pendekatan ini, jam yang hilang tidak dipadatkan seolah-olah dua observasi yang berjauhan merupakan dua jam berurutan.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{assets/pics/bab3_04_imputation_segments.png}
+\caption[Contoh imputasi dan batas segmen temporal]{Contoh observasi asli, imputasi, dan batas segmen pada koridor Cawang, 21--22 Agustus 2026 (UTC). Periode dipilih di sekitar gap panjang pertama pada dataset, bukan berdasarkan hasil prediksi. Garis tidak disambungkan melintasi waktu yang tidak valid. Sumber: data olahan penelitian.}
+\label{fig:b3-imputasi}
+\end{figure}
+
+Gambar~\ref{fig:b3-imputasi} memperlihatkan pengisian gap terisolasi dengan nilai sebelumnya serta pemutusan garis pada gap yang tidak dipertahankan. Penyajian kedua keadaan secara terpisah memperjelas perbedaan antara observasi yang tersedia, nilai pengganti, dan periode yang tidak digunakan dalam window.
+
+\subsection{Pembagian Data Secara Kronologis}
+\label{subsec:b3-split}
+
+Pembagian data dilakukan berdasarkan urutan 729 posisi pada grid awal, bukan berdasarkan jumlah waktu valid atau jumlah window. Batas pelatihan ditetapkan pada $\lfloor0{,}70\times729\rfloor=510$ posisi, sedangkan batas akhir validasi pada $\lfloor0{,}85\times729\rfloor=619$ posisi. Pembagian tersebut menghasilkan 510 posisi pelatihan, 109 posisi validasi, dan 110 posisi pengujian. Tidak dilakukan pengacakan waktu untuk menentukan pembagian ini.
+
+\begin{table}[htbp]
+\centering
+\caption{Pembagian kronologis pada grid dataset}
+\label{tab:b3-split}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.18\linewidth}>{\raggedright\arraybackslash}p{0.45\linewidth}rr}
+\hline
+\textbf{Bagian} & \textbf{Periode (UTC)} & \textbf{Grid} & \textbf{Valid}\\
+\hline
+Pelatihan & 12 Agustus 2026 04.00 -- 2 September 2026 09.00 & 510 & 491\\
+Validasi & 2 September 2026 10.00 -- 6 September 2026 22.00 & 109 & 109\\
+Pengujian & 6 September 2026 23.00 -- 11 September 2026 12.00 & 110 & 110\\
+\hline
+\end{tabular}
+\end{table}
+
+Pada Tabel~\ref{tab:b3-split}, kolom grid menyatakan jumlah posisi waktu sebelum penyaringan, sedangkan kolom valid menyatakan waktu yang memiliki identitas segmen. Pembentukan window dilakukan terpisah pada setiap bagian sehingga masukan dan target satu sampel tidak melintasi batas pelatihan, validasi, atau pengujian. Riwayat dari bagian sebelumnya tidak ditambahkan untuk membentuk window awal pada bagian berikutnya. Sebaliknya, penanganan gap sebelumnya dilakukan pada grid bersama; karena itu, pembentukan window terpisah tidak boleh ditafsirkan sebagai bukti bahwa seluruh keputusan prapemrosesan dilakukan secara independen per bagian.
+
+\subsection{Normalisasi Data}
+\label{subsec:b3-normalisasi}
+
+Kecepatan dinormalisasi menggunakan standardisasi. Matriks kecepatan pelatihan pada timestamp valid diratakan menjadi satu kolom sebelum statistik dihitung. Dengan demikian, digunakan satu rata-rata dan satu simpangan baku bersama untuk seluruh koridor, bukan scaler terpisah per koridor. Sebanyak $491\times64=31.424$ nilai pelatihan digunakan, termasuk nilai yang telah diimputasi pada waktu valid. Nilai dari validasi dan pengujian tidak digunakan untuk menghitung statistik ini.
+
+\begin{equation}
+ z_{t,n}=\frac{v_{t,n}-\mu_{\mathrm{train}}}{\sigma_{\mathrm{train}}}.
+ \label{eq:b3-standardisasi}
+\end{equation}
+
+Pada Persamaan~\ref{eq:b3-standardisasi}, $v_{t,n}$ adalah kecepatan koridor $n$ pada waktu $t$, sedangkan $z_{t,n}$ adalah nilai hasil standardisasi. Implementasi StandardScaler menggunakan simpangan baku populasi. Pemeriksaan ulang terhadap data pelatihan menghasilkan $\mu_{\mathrm{train}}=30{,}5066$ km/jam dan $\sigma_{\mathrm{train}}=11{,}3311$ km/jam, sesuai statistik yang tersimpan. Masukan dan target pada seluruh bagian ditransformasikan menggunakan statistik yang sama tanpa fit ulang pada validasi maupun pengujian. Pemisahan ini mencegah informasi distribusi kecepatan validasi dan pengujian masuk melalui estimasi scaler \cite{sklearn2026pitfalls}.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{assets/pics/bab3_05_split_normalization.png}
+\caption[Alur pembagian data dan normalisasi]{Alur pembagian data dan normalisasi berdasarkan periode serta statistik dataset aktual. Lebar kotak tidak menyatakan proporsi durasi. Sumber: implementasi prapemrosesan dan scaler tersimpan.}
+\label{fig:b3-split-normalisasi}
+\end{figure}
+
+Gambar~\ref{fig:b3-split-normalisasi} merangkum perbedaan antara penentuan waktu valid, pembagian grid, dan estimasi statistik pelatihan. Untuk interpretasi dalam km/jam, nilai yang telah distandardisasi dapat dikembalikan melalui $v=z\sigma_{\mathrm{train}}+\mu_{\mathrm{train}}$. Penggunaan scaler pelatihan saja tidak menghapus keterbatasan seleksi koridor dan pemilihan gap yang telah dijelaskan.
+
+\subsection{Pembentukan Sliding Window dan Target Multi-Horizon}
+\label{subsec:b3-window}
+
+Matriks pada setiap bagian diurutkan berdasarkan waktu dan urutan node yang telah ditetapkan. Window digeser satu langkah untuk membentuk masukan sepanjang 12 langkah, yaitu dari $t-11$ sampai $t$. Target diambil pada $t+1$, $t+3$, dan $t+6$. Pada grid satu jam, jarak titik pertama dan terakhir masukan adalah 11 jam; istilah 12 langkah merujuk pada jumlah posisi observasinya. Ilustrasi hubungan masukan dan target mengikuti Gambar~\ref{fig:b2-window}.
+
+Sampel hanya dipertahankan apabila seluruh indeks masukan dan ketiga target mempunyai identitas segmen yang sama. Karena segmen dibentuk dari waktu valid yang berurutan, aturan ini mencegah pengambilan target setelah gap panjang seolah-olah target tersebut berjarak satu, tiga, atau enam jam. Satu sampel mempunyai tensor masukan $X\in\mathbb{R}^{12\times64\times1}$ dan target $Y\in\mathbb{R}^{3\times64}$. Dimensi terakhir masukan hanya memuat kecepatan; mask observasi dan mask imputasi disimpan terpisah dan tidak ditambahkan sebagai kanal fitur.
+
+Mask target diambil dari is\_observed pada waktu target, sehingga bentuknya juga $3\times64$. Nilai target yang berasal dari imputasi dapat tetap tersimpan dalam tensor, tetapi mask-nya bernilai salah dan tidak diperlakukan sebagai observasi aktual dalam evaluasi bermasker. Pembentukan dataset tidak membuang seluruh window hanya karena sebagian targetnya tidak terobservasi. Jumlah target valid dihitung sebagai pasangan sampel--koridor pada masing-masing horizon.
+
+Hasil pembentukan dataset tersimpan memuat 415 sampel pelatihan, 92 sampel validasi, dan 93 sampel pengujian. Pada data pengujian terdapat 2.944 target valid untuk horizon satu jam, 2.944 untuk tiga jam, dan 3.008 untuk enam jam. Perbedaan himpunan target ini perlu diperhatikan saat membandingkan galat antarhorizon; perubahan galat tidak semata-mata menyatakan pengaruh jarak prediksi. Mask target, waktu target, serta mask masukan disimpan bersama tensor agar status observasi dapat ditelusuri saat evaluasi dan visualisasi.
