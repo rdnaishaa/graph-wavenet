@@ -145,3 +145,28 @@ def get_route_between_corridors(
         end_lon=float(destination_record["longitude"]),
         traffic=traffic,
     )
+
+
+def get_alternative_routes(origin, destination):
+    """Request up to three road geometries, without live traffic assumptions."""
+    check_tomtom_api_key()
+    url = ('https://api.tomtom.com/routing/1/calculateRoute/'
+           f"{float(origin['latitude'])},{float(origin['longitude'])}:"
+           f"{float(destination['latitude'])},{float(destination['longitude'])}/json")
+    response = requests.get(url, params={
+        'key': TOMTOM_API_KEY, 'traffic': 'false', 'routeType': 'fastest',
+        'travelMode': 'car', 'maxAlternatives': 2, 'instructionsType': 'text',
+        'language': 'en-GB',
+    }, timeout=30)
+    response.raise_for_status()
+    result = []
+    for route in response.json().get('routes', []):
+        points = [p for leg in route['legs'] for p in leg['points']]
+        streets = list(dict.fromkeys(i.get('street', '') for i in
+            route.get('guidance', {}).get('instructions', []) if i.get('street')))
+        result.append({'route_df': pd.DataFrame(points),
+                       'distance_km': route['summary']['lengthInMeters'] / 1000,
+                       'streets': streets})
+    if not result:
+        raise ValueError('Tidak ada alternatif rute yang tersedia.')
+    return result

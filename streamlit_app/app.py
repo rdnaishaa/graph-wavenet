@@ -23,7 +23,15 @@ from streamlit_app.research_views import (
 )
 from streamlit_app.theme import apply_theme, render_header
 
-st.set_page_config(page_title="arus — Traffic explorer", page_icon="↗", layout="wide")
+st.set_page_config(page_title="arus — Traffic explorer", page_icon="↗", layout="wide", initial_sidebar_state="expanded")
+if st.session_state.get("app_surface", "explore") == "explore":
+    from streamlit_app.explore import render_explorer
+    render_explorer(get_corridor_metadata(), get_reference_times())
+    st.stop()
+
+if st.button("← Kembali ke peta", key="return_explorer"):
+    st.session_state["app_surface"] = "explore"
+    st.rerun()
 apply_theme()
 metadata = get_corridor_metadata()
 references = get_reference_times()
