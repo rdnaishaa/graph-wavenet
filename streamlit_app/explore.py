@@ -161,6 +161,16 @@ def render_explorer(metadata, references):
     .st-key-explorer-canvas [data-testid="stDeckGlJsonChart"]>div {position:absolute!important;inset:0!important;width:100%!important;height:100%!important}
     [data-testid="stSidebar"] {z-index:100!important;position:fixed!important;left:0;top:0;bottom:0;height:calc(100dvh - 28px)!important}
     .explore-top,.explore-legend {z-index:101!important}
+    /* Keep Streamlit's measured chart width equal to the visible map canvas.
+       The sidebar floats above it, so it must not reserve a second layout column. */
+    [data-testid="stMain"] {width:100vw!important;max-width:100vw!important;margin-left:0!important;flex:0 0 100vw!important}
+    [data-testid="stMainBlockContainer"] {width:100%!important;max-width:none!important}
+    .st-key-explorer-canvas {width:100%!important}
+    [data-testid="stSidebar"] {
+      transform:none!important;visibility:visible!important;display:block!important;
+      width:344px!important;min-width:344px!important;max-width:344px!important;
+    }
+    [data-testid="stSidebarCollapseButton"], [data-testid="stSidebarCollapsedControl"] {display:none!important}
     @media(max-width:760px) {
       [data-testid="stSidebar"] {position:fixed!important;top:auto!important;bottom:0!important;left:0!important;right:0!important;width:100vw!important;min-width:0!important;max-width:100vw!important;height:43dvh!important;max-height:43dvh!important;margin:0!important;border-radius:22px 22px 0 0!important;transform:none!important;box-shadow:0 -4px 22px #16394520!important;z-index:100!important}
       [data-testid="stSidebar"]:before {content:"";display:block;width:38px;height:4px;background:#b4b9b5;border-radius:9px;margin:10px auto 0}
@@ -235,8 +245,10 @@ def render_explorer(metadata, references):
                     with st.spinner('Mencari rute jalan…'):
                         route = road_route(node, destination)
                     st.session_state['explore_routes_v2'] = (node, destination, route)
+                except (RuntimeError, ValueError) as error:
+                    st.warning(str(error))
                 except Exception:
-                    st.warning('Rute jalan belum tersedia. Periksa koneksi dan konfigurasi TomTom. Estimasi durasi belum dapat dihitung.')
+                    st.warning('Respons rute belum dapat diproses. Coba hitung perjalanan kembali.')
         saved_route = st.session_state.get('explore_routes_v2')
         route = saved_route[2] if saved_route and saved_route[:2] == (node, destination) else None
         alternatives = route or []

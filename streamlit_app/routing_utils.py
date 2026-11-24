@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from dotenv import load_dotenv
 
 # ============================================================
@@ -153,12 +155,27 @@ def get_alternative_routes(origin, destination):
     url = ('https://api.tomtom.com/routing/1/calculateRoute/'
            f"{float(origin['latitude'])},{float(origin['longitude'])}:"
            f"{float(destination['latitude'])},{float(destination['longitude'])}/json")
-    response = requests.get(url, params={
-        'key': TOMTOM_API_KEY, 'traffic': 'false', 'routeType': 'fastest',
-        'travelMode': 'car', 'maxAlternatives': 2, 'instructionsType': 'text',
-        'language': 'en-GB',
-    }, timeout=30)
-    response.raise_for_status()
+    # Retry temporary network/server failures; never expose the URL containing the key.
+    with requests.Session() as session:
+        session.mount('https://', HTTPAdapter(max_retries=Retry(
+            total=2, backoff_factor=0.5, status_forcelist=[502, 503, 504],
+            allowed_methods=['GET'], respect_retry_after_header=False)))
+        try:
+            response = session.get(url, params={
+                'key': TOMTOM_API_KEY, 'traffic': 'false', 'routeType': 'fastest',
+                'travelMode': 'car', 'maxAlternatives': 2, 'instructionsType': 'text',
+                'language': 'en-GB',
+            }, timeout=(10, 30))
+        except requests.Timeout:
+            raise RuntimeError('TomTom terlalu lama merespons. Coba hitung perjalanan lagi.') from None
+        except requests.RequestException:
+            raise RuntimeError('Koneksi ke TomTom gagal. Periksa internet lalu coba lagi.') from None
+    if response.status_code in (401, 403):
+        raise RuntimeError('Akses routing TomTom ditolak. Periksa API key dan izin Routing API.')
+    if response.status_code == 429:
+        raise RuntimeError('Batas permintaan TomTom tercapai. Tunggu sebentar lalu coba lagi.')
+    if not response.ok:
+        raise RuntimeError(f'TomTom gagal mencari rute (HTTP {response.status_code}). Coba lagi atau pilih tujuan lain.')
     result = []
     for route in response.json().get('routes', []):
         points = [p for leg in route['legs'] for p in leg['points']]
